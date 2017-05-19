@@ -1,0 +1,16 @@
+\documentclass{tudscrartcl}%
+\usepackage{csvtoolbox}%
+\tikzexternalize[mode=list and make]%
+
+\begin{document}
+
+    \csvplot[%
+        output dir = fig,% must exist
+        axis rows = 2,
+        axis columns = 2,
+        plot data x/y= {x/y, x/b, x/y},%
+        caption = This is a caption,%
+        label = figure1,%
+    ] {data.csv}%
+
+\end{document}

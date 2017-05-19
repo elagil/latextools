@@ -1,0 +1,134 @@
+\NeedsTeXFormat{LaTeX2e}%
+\ProvidesPackage{csvtoolbox}[2017/05/19 CSV Plot toolbox]%
+
+\RequirePackage{etoolbox}%
+\RequirePackage{pgfplots}%
+\RequirePackage{tikz}%
+\RequirePackage{pgfkeys}%
+\RequirePackage{float}%
+\RequirePackage{hyperref}%
+\RequirePackage{tikzscale}%
+
+\pgfplotsset{compat=newest}%
+\usepgfplotslibrary{groupplots}%
+\usetikzlibrary{external}
+
+\DeclareOption{default}{%
+    \pgfplotsset{csvPlotStyle/.style=%
+        {%
+        cycle list name=color,%
+        grid=both,%
+        grid style={dashed, gray},%
+        }%
+    }%
+    \pgfkeys{
+        % Switch to /csvplot key subset
+        /csvplot/.is family, /csvplot,%
+        % User options
+        def/.style = {%
+            axis rows = 1,%
+            axis columns = 1,%,
+            output dir =.,%
+            legend pos = outer south,%
+            height = \textwidth,%
+            width = \textwidth,%
+            plot data x/y = x/y,%
+            common style = csvPlotStyle,%
+            caption = ,%
+            label = ,%
+            align = top,%
+        }%
+    }%
+}%
+%
+\ExecuteOptions{default}%
+\ProcessOptions\relax%
+% Define outer south legend style
+\pgfplotsset{
+    every axis x label/.append style={
+        alias=current axis xlabel
+    },
+    legend pos/outer south/.style={
+        /pgfplots/legend style={
+            at={%
+                (%
+                \@ifundefined{pgf@sh@ns@current axis xlabel}%
+                {xticklabel cs:0.5}%
+                {current axis xlabel.south}%
+                )%
+            },
+            anchor=north
+        }
+    }
+}
+%
+% Set up the keys
+\pgfkeys{
+    % Switch to /csvplot key subset
+    /csvplot,%
+    %% definitions
+    axis rows/.estore in = \csvPlotAxisRows,%
+    axis columns/.estore in = \csvPlotAxisCols,%
+    output dir/.estore in = \csvPlotOutputDir,%
+    legend pos/.estore in = \csvLegPos,%
+    height/.estore in = \csvPlotHeight,%
+    width/.estore in = \csvPlotTotalWidth,%
+    plot data x/y/.estore in = \csvPlotXYCol,%
+    common style/.estore in = \csvPlotStyle,%
+    caption/.estore in = \csvPlotCaption,%
+    label/.estore in = \csvPlotLabel,%
+    align/.style = {alignments/#1/.get = \csvPlotAlignment},%
+    % dictionary for alignment of figure
+    alignments/.cd,%
+        top/.initial = t,%
+        here/.initial = h,%
+        bottom/.initial = b,%
+        force/.initial = H,%
+        page/.initial = p,%
+}
+%
+\newcommand{\csvplot}[2][]{%
+    \pgfkeys{/csvplot, def, #1}%
+    % The following ensures recompilation of the externalized Tikz image
+    % if the options are changed. Do it only if externalization is on.
+    \if1\tikzexternalize@hasbeencalled
+        \ifx \tikz \tikzexternal@origtikz
+        \else
+            \newwrite\tempfile%
+            \immediate\openout\tempfile=./\csvPlotOutputDir/\csvPlotLabel.md5_%
+            \immediate\write\tempfile{\pdfmdfivesum{#1}}%
+            \immediate\closeout\tempfile%
+            \tikzsetnextfilename{./\csvPlotOutputDir/\csvPlotLabel}%
+            \tikzpicturedependsonfile{./\csvPlotOutputDir/\csvPlotLabel.md5_}%
+        \fi
+    \fi
+    % Expand figure options
+    \def\efigure{\begin{figure}}\expandafter\efigure\expandafter[\csvPlotAlignment]%
+    \centering%
+    \begin{tikzpicture}%
+        \begin{groupplot} [%
+            \csvPlotStyle,%
+            height=1/\csvPlotAxisRows*\csvPlotHeight,%
+            width=1/\csvPlotAxisCols*\csvPlotTotalWidth,%
+            legend pos=\csvLegPos,%
+            group style = {group size = \csvPlotAxisCols\space by \csvPlotAxisRows},%
+            ]%
+            % Plot loop: All x/y columns for multiple plots in one axis
+            \edef\XYIterate{%
+                \noexpand\pgfplotsforeachungrouped \noexpand\x/\noexpand\y in {\csvPlotXYCol}%
+            }%
+            \XYIterate {%
+                \eappto\PlotList{%
+                    \noexpand\nextgroupplot%
+                    \noexpand\addplot table[x=\x, y=\y, col sep=comma] {#2};%
+                    \noexpand\addlegendentry{\y}%
+                }%
+            }%
+            \PlotList%
+        \end{groupplot}%
+    \end{tikzpicture}%
+    \caption{\csvPlotCaption}%
+    \label{\csvPlotLabel}%
+    \end{figure}%
+    %
+}%
